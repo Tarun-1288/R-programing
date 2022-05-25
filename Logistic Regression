@@ -1,0 +1,77 @@
+#### Logistic Regression and Variable Selection ####
+
+## Step 0: Perform Exploratory Data Analysis 
+## Step 1: Partition our Data 
+## Step 2: Train or Fit LASSO Logistic Regression Model 
+##Step 3: Get Predictions using Testing Set Data 
+##Step 4: Evaluate Model Performance 
+
+# UPLOAD & INSTALL
+credit_data <- read.csv(file = "credit_Default.csv", header=T) 
+
+install.packages("skimr") 
+library(skimr) 
+summaryStats <- skim(credit_data) 
+summaryStats 
+
+
+## More Info response variable. 
+
+mean(credit_data$default) 
+table(credit_data$default) 
+
+## Box-Plot 
+
+boxplot(credit_data$LIMIT_BAL~credit_data$default) 
+
+boxplot(credit_data$AGE~credit_data$default) 
+
+
+## Step 1: Partition our Data 
+
+credit_predictors_dummy <- model.matrix(default~ ., data = credit_data)#create dummy variables expect for the response 
+credit_predictors_dummy<- data.frame(credit_predictors_dummy[,-1]) #get rid of intercept 
+credit_data <- cbind(default=credit_data$default, credit_predictors_dummy) 
+
+## Next, we need to convert the response to factor so that caret knows we are fitting a classification model. 
+
+## convert from Response from integer to factor 
+credit_data$default<-as.factor(credit_data$default) 
+
+## Randomly split the data to training (80%) and testing (20%) datasets: 
+
+library(caret) 
+set.seed(99) #set random seed 
+index <- createDataPartition(credit_data$default, p = .8,list = FALSE) 
+credit_train <-credit_data[index,] 
+credit_test <- credit_data[-index,] 
+
+## Step 2: Train or Fit LASSO Logistic Regression Model 
+
+#install.packages("glmnet") 
+library(glmnet) 
+
+credit_model <- train(default ~ ., 
+                          data = credit_train, 
+                          method = "glmnet", 
+                          trControl =trainControl(method = "cv",number = 5))  
+
+## plot variable importance 
+plot(varImp(credit_model)) 
+
+## list coefficients selected 
+coef(credit_model$finalModel, credit_model$bestTune$lambda) 
+
+## Step 3: Get Predictions using Testing Set Data 
+
+## First, get the predicted probabilities of the test data. 
+predprob_lasso<-predict(credit_model , credit_test, type="prob") 
+
+## Step 4: Evaluate Model Performance 
+## Get AUC and ROC curve for LASSO Model. 
+
+install.packages("ROCR") 
+library(ROCR) 
+pred_lasso <- prediction(predprob_lasso[,2], credit_test$default) 
+perf_lasso <- performance(pred_lasso, "tpr", "fpr") 
+plot(perf_lasso, colorize=TRUE) 
