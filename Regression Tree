@@ -1,0 +1,40 @@
+library(caret)
+data <- read.csv(file = ".csv", header=T) ##load data
+
+#install.packages("skimr")
+library(skimr)
+summaryStats <- skim(Boston_data)
+summaryStats
+
+## Randomly split the data to training (80%) and testing (20%) datasets:
+set.seed(99) #set random seed
+index <- createDataPartition( _data$medv, p = .8,list = FALSE)
+train <-_data[index,]
+test <- _data[-index,]
+
+# install and load packages for machine learning model
+#install.packages("rpart")
+library(rpart)
+housing_model <- train(medv ~ .,
+                          data = Boston_train,
+                          method = "rpart",
+                          trControl =trainControl(method = "cv",number = 5),
+                          ## Now specify the exact models 
+                          ## to evaluate:
+                          tuneGrid = expand.grid(cp=seq(0.01,0.2,0.01)))
+                          
+#install.packages("rpart.plot")
+library(rpart.plot)
+rpart.plot(housing_model$finalModel, type=5)
+
+
+medv_pred_tree<-predict(housing_model , Boston_test)
+
+boston.reg = lm(medv~., data = Boston_train)
+boston_test_pred_reg = predict(boston.reg, Boston_test)
+reg_ASE=mean((boston_test_pred_reg - Boston_test$medv)^2)
+reg_ASE
+## [1] 24.60268
+
+
+
