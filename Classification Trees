@@ -1,0 +1,60 @@
+data <- read.csv(file = "cust_churn_dataset.csv", header=T)
+
+library(skimr)
+summaryStats <- skim(churn_data)
+summaryStats
+
+##Partition of data
+#install.packages("tidyverse")
+library("tidyverse") #needed for functions: select() and fct_recode()
+#get predictors without response 
+churn_data_predictors<-select(churn_data,-Churn)
+#create dummy variables expect for the response
+dummies_model <- dummyVars(~ ., data = churn_data_predictors)
+#provide only predictors that are now converted to dummy variables
+churn_predictors_dummy<- data.frame(predict(dummies_model, newdata = churn_data)) 
+#recombine predictors including dummy variables with response
+churn_data <- cbind(Churn=churn_data$Churn, churn_predictors_dummy) 
+## Next, we need to convert the response to a factor, since it is an integer. Also, good practice is to rename the response from 0, 1 to notchurn, churn to reduce misunderstandings.
+churn_data$Churn<-as.factor(churn_data$Churn)
+churn_data$Churn<-fct_recode(churn_data$Churn, notchurn = "0", churn = "1") 
+# Randomly split the data to training (80%) and testing (20%) datasets:
+set.seed(99) #set random seed
+index <- createDataPartition(churn_data$Churn, p = .8,list = FALSE)
+churn_train <-churn_data[index,]
+churn_test <- churn_data[-index,]
+
+#install.packages("rpart")
+library(rpart)
+churn_model <- train(Churn ~ .,
+                          data = churn_train,
+                          method = "rpart",
+                          trControl =trainControl(method = "cv",number = 5,
+ ## Estimate class probabilities
+ classProbs = TRUE,
+ #needed to get ROC
+ summaryFunction = twoClassSummary),
+                          metric="ROC") 
+
+plot(varImp(churn_model))
+
+install.packages("rpart.plot")
+library(rpart.plot)
+rpart.plot(churn_model$finalModel, type=5)
+
+#First, get the predicted probabilities of the test data.
+predprob_churn<-predict(churn_model , churn_test, type="prob")
+
+#install.packages("ROCR")
+library(ROCR)
+pred_lasso <- prediction(predprob_churn[,2], churn_test$Churn,label.ordering = c("notchurn","churn"))
+perf_lasso <- performance(pred_lasso, "tpr", "fpr")
+plot(perf_lasso, colorize=TRUE)
+
+#Get the AUC
+auc_lasso<-unlist(slot(performance(pred_lasso, "auc"), "y.values"))
+auc_lasso
+
+
+
+
