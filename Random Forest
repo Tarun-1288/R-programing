@@ -1,0 +1,64 @@
+#install.packages("caret") #this may take a while
+library(caret)
+
+# load breast cancer data
+cancer_data <- read.csv("cancer_data.csv", header=T)
+
+#install.packages("skimr")
+library(skimr)
+summaryStats <- skim(cancer_data)
+summaryStats
+
+## partition
+cancer_data$Outcome<-as.factor(cancer_data$Outcome)
+set.seed(99)
+index <- createDataPartition(cancer_data$Outcome, p = .8,list = FALSE)
+bc_train <- cancer_data[index,]
+bc_test <- cancer_data[-index,]
+
+#Train model with preprocessing & cv
+#install.packages("randomForest")
+library(randomForest)
+set.seed(8)
+model_rf <- train(Outcome ~ .,
+                          data = bc_train,
+                          method = "rf",
+                          trControl =trainControl(method = "cv", 
+             number = 5, 
+             #Estimate class probabilities
+             classProbs = TRUE,
+            ## Evaluate performance using the following function
+            summaryFunction = twoClassSummary),
+                          metric="ROC")
+model_rf
+
+plot(model_rf)
+plot(varImp(model_rf))
+
+#Set up tuning parameter selection and CV for the training set
+# define a grid of parameter options to try
+rf_grid <- expand.grid(mtry = c(1, 3,6,9))
+rf_grid
+# Train model with preprocessing & cv
+model_rf_tune <- train(Outcome ~ .,
+                          data = bc_train,
+                          method = "rf",
+                          trControl =fitControl,
+                           # provide a grid of parameters
+                          tuneGrid = rf_grid,
+                          verbose = FALSE)
+
+
+bc_prob<- predict(model_rf, bc_test, type="prob")
+
+library(ROCR)
+#In label.ordering the negative class is first then the positive class
+pred = prediction(bc_prob[,2], bc_test$Outcome,label.ordering =c("No","Yes")) 
+perf = performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+
+
+
+
+
+
