@@ -1,0 +1,45 @@
+library(caret)
+data <- read.csv(".csv", header=T)
+set.seed(99)
+#convert to dummy variables for character variables using model.matrix because we will be using linear regression
+data<-model.matrix(~.,data=Hitters_data)
+data<-data.frame(Hitters_data[,-1])
+index <- createDataPartition(Hitters_data$Salary, p = .8,list = FALSE)
+train <- Hitters_data[index,]
+test <- Hitters_data[-index,]
+
+#Set up tuning parameter selection and CV for the training set
+fitControl<-trainControl(method = "cv", 
+             number = 5)
+
+#install.packages("pls")
+library(pls)
+
+# define a grid of parameter options to try
+pcr_grid <- expand.grid(ncomp = 1:(ncol(Hitters_train)-1))
+pcr_grid
+model_pcr <- train(Salary ~ .,
+                          data = Hitters_train,
+                          method = "pcr",
+                   #center and scale variables       
+                   preProcess = c("center", "scale"),
+                   #set up cross-validation
+                          trControl =fitControl,  # provide a grid of number of Principal comps to try
+                          tuneGrid = pcr_grid)
+model_pcr
+
+# Summarize the final model
+summary(model_pcr)
+plot(model_pcr)
+plot(varImp(model_pcr))
+
+H<- predict(model_pcr, test)
+mean((H- test$Salary)^2)
+
+
+
+
+
+
+
+
